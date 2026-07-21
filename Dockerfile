@@ -16,4 +16,4 @@ RUN python -m src.pipeline
 ENV PORT=8080
 EXPOSE 8080
 
-CMD adk web --host 0.0.0.0 --port $PORT .
+CMD adk web --host 0.0.0.0 --port $PORT --allow_origins "https://rag-hr-assistant-fi2o.onrender.com" .
