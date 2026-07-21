@@ -1,19 +1,17 @@
+
 """
 embedder.py
 -----------
-Ingestion step 3: converts text chunks into vector embeddings using a
-FREE, LOCAL embedding model (sentence-transformers, all-MiniLM-L6-v2).
-
-No API key, no signup, no cost — the model downloads once (~90MB) the
-first time you run this, then everything runs on your own machine,
-fully offline.
+Converts text chunks into vector embeddings using fastembed
+(ONNX Runtime, CPU-only, no PyTorch) - much lighter than
+sentence-transformers, same all-MiniLM-L6-v2 model and same
+384-dim vectors, ideal for memory-constrained hosting.
 """
 
-from sentence_transformers import SentenceTransformer
 
-# Loaded once at import time and reused for every call to embed_chunks().
-_model = SentenceTransformer("all-MiniLM-L6-v2")
+from fastembed import TextEmbedding
 
+_model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
 def embed_chunks(chunks: list[str]) -> list[list[float]]:
     """
@@ -26,8 +24,8 @@ def embed_chunks(chunks: list[str]) -> list[list[float]]:
         A list of embedding vectors (each a list of 384 floats),
         one per chunk, in the same order.
     """
-    vectors = _model.encode(chunks, show_progress_bar=False)
-    return vectors.tolist()
+    embeddings = list(_model.embed(chunks))
+    return [vec.tolist() for vec in embeddings]
 
 
 if __name__ == "__main__":
