@@ -3,11 +3,19 @@
 A Retrieval-Augmented Generation (RAG) chatbot that answers employee questions
 from a company's HR policy document — built end-to-end on **Google's Agent
 Development Kit (ADK)** and the **free tier of the Gemini API**, with a fully
-local, free retrieval stack. **Total cost to build and run this project: $0.**
+local, free retrieval stack, and deployed live on **Render**.
+
+**🔗 Live demo:** [rag-hr-assistant-fi2o.onrender.com](https://rag-hr-assistant-fi2o.onrender.com)
+*(free-tier hosting — the app spins down after 15 minutes of inactivity, so
+the first request after a while may take 30–60 seconds to wake it up)*
 
 > Ask it "How many days of annual leave do I get?" and it retrieves the exact
 > relevant clause from the HR policy PDF and answers *only* from that context —
-> not from the model's general knowledge.
+> not from the model's general knowledge. Ask it something the document
+> doesn't cover (e.g. "What's the maternity leave policy?") and it says so
+> instead of guessing — that's the grounding behavior RAG exists to provide.
+
+**Total cost to build and run this project: $0.**
 
 ---
 
@@ -17,9 +25,9 @@ local, free retrieval stack. **Total cost to build and run this project: $0.**
 
 The system has two phases:
 
-1. **Ingestion pipeline** (run once, offline): a PDF is read, split into
-   overlapping chunks, embedded locally, and stored in a vector database on
-   disk.
+1. **Ingestion pipeline** (run once, offline — or baked into the Docker image
+   at build time for deployment): a PDF is read, split into overlapping
+   chunks, embedded locally, and stored in a vector database on disk.
 2. **Query-time agent** (Google ADK): the user's question is handed to a
    Gemini-powered ADK agent, which calls a retrieval **tool** to pull the most
    relevant chunks from the vector database, then generates an answer
@@ -29,18 +37,27 @@ The system has two phases:
 
 ## Tech stack
 
-| Layer           | Technology                                             | Why                                                                                                                                      | Cost               |
-| --------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| Agent framework | **Google Agent Development Kit (ADK)**           | Production-style agent runtime with tool-calling, a built-in dev UI (`adk web`), and a REST server (`adk api_server`) out of the box | Free (open source) |
-| LLM             | **Gemini 2.5 Flash** (Google AI Studio)          | Fast, capable, first-class ADK model provider — no adapter needed                                                                       | Free tier          |
-| Embeddings      | **sentence-transformers** (`all-MiniLM-L6-v2`) | Runs entirely on your own machine — no API call, no rate limit, no key                                                                  | Free, local        |
-| Vector database | **ChromaDB** (persistent, local)                 | Zero-setup vector store that lives in a folder on disk                                                                                   | Free, local        |
-| PDF parsing     | **pypdf**                                        | Lightweight, reliable text extraction                                                                                                    | Free               |
-| Orchestration   | Plain Python                                           | Easy to read, easy to extend                                                                                                             | —                 |
+| Layer | Technology | Why | Cost |
+|---|---|---|---|
+| Agent framework | **Google Agent Development Kit (ADK)** | Production-style agent runtime with tool-calling, a built-in dev UI (`adk web`), and a REST server (`adk api_server`) out of the box | Free (open source) |
+| LLM | **Gemini 2.5 Flash** (Google AI Studio) | Fast, capable, first-class ADK model provider — no adapter needed | Free tier |
+| Embeddings | **sentence-transformers** (`all-MiniLM-L6-v2`) | Runs entirely on your own machine — no API call, no rate limit, no key | Free, local |
+| Vector database | **ChromaDB** (persistent, local) | Zero-setup vector store that lives in a folder on disk | Free, local |
+| PDF parsing | **pypdf** | Lightweight, reliable text extraction | Free |
+| Orchestration | Plain Python | Easy to read, easy to extend | — |
 
 **No OpenAI key. No Pinecone account. No credit card, anywhere.** The only
 credential in the whole project is a free Gemini API key from Google AI
 Studio.
+
+> **Why not sentence-transformers?** It's a perfectly good library and the
+> project started with it, but it pulls in full PyTorch (including CUDA
+> libraries, even on a CPU-only host) — heavy enough that it exceeded the
+> 512MB RAM ceiling on Render's free tier during a real request and crashed
+> the container (`Ran out of memory (used over 512MB)`). Swapping to
+> `fastembed`'s ONNX runtime keeps the exact same model and output vectors
+> at a fraction of the memory cost. See [Deployment notes](#deployment-notes--things-that-broke-and-how-they-were-fixed)
+> below for the full story.
 
 ---
 
@@ -50,6 +67,8 @@ Studio.
 rag-hr-assistant/
 ├── README.md
 ├── requirements.txt
+├── Dockerfile                    # builds + deploys the app (see Deploying to Render)
+├── .dockerignore
 ├── .env.example                  # root env (used by scripts/terminal_chat.py)
 ├── .gitignore
 ├── LICENSE
@@ -63,7 +82,7 @@ rag-hr-assistant/
 │   ├── ingestion/
 │   │   ├── pdf_reader.py           # step 1: PDF -> raw text per page
 │   │   ├── chunker.py               # step 2: text -> overlapping chunks
-│   │   ├── embedder.py               # step 3: chunks -> local embeddings
+│   │   ├── embedder.py               # step 3: chunks -> local embeddings (fastembed)
 │   │   └── vector_store.py            # step 4: store in local ChromaDB
 │   └── retrieval/
 │       └── retriever.py            # embed a question, search ChromaDB
@@ -81,13 +100,13 @@ monolithic script.
 
 ---
 
-## Setup
+## Setup (local)
 
 ### 1. Clone and install
 
 ```bash
-git clone <your-repo-url> rag-hr-assistant
-cd rag-hr-assistant
+git clone https://github.com/yashika306/RAG-HR-Assistant.git
+code ..
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
@@ -124,9 +143,9 @@ This reads `data/hr_policy.pdf`, chunks it, embeds it locally, and creates a
 `chroma_db/` folder at the project root — that folder **is** your vector
 database. Delete it anytime and re-run this command to rebuild from scratch.
 
-> **First run only:** `sentence-transformers` downloads the
-> `all-MiniLM-L6-v2` model (~90MB) once from Hugging Face. After that,
-> everything — ingestion *and* retrieval — runs fully offline.
+> **First run only:** `fastembed` downloads the ONNX `all-MiniLM-L6-v2`
+> model (~90MB) once from Hugging Face. After that, everything — ingestion
+> *and* retrieval — runs fully offline.
 
 To use your **own** PDF instead of the sample policy, replace
 `data/hr_policy.pdf` (or pass a path to `process_document()` in
@@ -168,7 +187,8 @@ python -m scripts.terminal_chat
    chunks with 150-character overlap, so no sentence is lost at a chunk
    boundary.
 3. **`embedder.py`** turns each chunk into a 384-dimension vector using
-   `all-MiniLM-L6-v2`, downloaded once and cached locally.
+   `all-MiniLM-L6-v2` via `fastembed`'s ONNX Runtime, downloaded once and
+   cached locally.
 4. **`vector_store.py`** upserts every `(chunk, embedding)` pair into a
    persistent ChromaDB collection on disk.
 5. At query time, **`hr_policy_agent/agent.py`** defines a `search_hr_policy`
@@ -198,12 +218,74 @@ of paid annual leave per calendar year, accrued monthly...
 
 ---
 
+## Deploying to Render
+
+The project includes a `Dockerfile` that:
+1. Installs dependencies
+2. Runs the ingestion pipeline **at image build time**, so the vector
+   database is baked into the image itself (Render's free-tier disk is
+   ephemeral — this avoids needing to rebuild it on every container restart)
+3. Starts `adk web`, bound to `0.0.0.0` and Render's `$PORT`
+
+### Steps
+
+1. Push this repo to GitHub.
+2. Render dashboard → **New** → **Web Service** → connect the repo. Render
+   auto-detects the `Dockerfile`.
+3. Instance type: **Free** to start (see notes below).
+4. Under **Environment Variables**, add:
+   ```
+   GOOGLE_API_KEY = your-actual-gemini-key
+   GOOGLE_GENAI_USE_VERTEXAI = FALSE
+   ```
+   (`ALLOWED_ORIGIN` must match your actual Render URL — see
+   [why below](#deployment-notes--things-that-broke-and-how-they-were-fixed).)
+5. Deploy. The build step runs the ingestion pipeline, so expect it to take
+   a few minutes.
+6. Once live, open the Render URL, select `hr_policy_agent`, and chat.
+
+### Deployment notes — things that broke, and how they were fixed
+
+Two real issues came up deploying this to Render, worth documenting since
+they're common gotchas for any ADK app on a non-Google host:
+
+**1. `403 Forbidden` on `POST /sessions`.**
+`adk web` rejects browser requests from origins it doesn't recognize as a
+CORS/security default — it works locally because `localhost` is trusted by
+default, but a public Render URL isn't, until you explicitly allow it.
+**Fix:** pass `--allow_origins "<your-render-url>"` to `adk web` (wired up
+here via the `ALLOWED_ORIGIN` environment variable in the `Dockerfile`).
+
+**2. `Ran out of memory (used over 512MB)` — container killed mid-request.**
+The original ingestion stack used `sentence-transformers`, which pulls in
+full PyTorch (plus CUDA libraries, even on a CPU-only host). That combined
+with ChromaDB and the ADK/Gemini stack exceeded Render's free-tier 512MB RAM
+the moment a real chat request triggered the full embed → retrieve →
+generate flow. **Fix:** swapped to `fastembed`, which runs the identical
+`all-MiniLM-L6-v2` model on ONNX Runtime instead of PyTorch — same output
+vectors, a fraction of the memory footprint, comfortably fits in 512MB.
+
+### Things to know before you deploy
+
+- **Free-tier services spin down after 15 minutes of inactivity** and take
+  ~30–60 seconds to wake back up on the next request. Fine for a portfolio
+  demo link, not for something that needs to always be instantly responsive.
+- **`adk web` is a dev/testing UI**, not meant for production traffic — fine
+  for showcasing on a resume, just worth knowing if it comes up in an
+  interview.
+- If you update `data/hr_policy.pdf`, trigger a new Render deploy (not just
+  a restart) so the Docker build re-runs ingestion and bakes in the new
+  chunks.
+
+---
+
 ## Design notes / trade-offs
 
-- **`all-MiniLM-L6-v2` vs. a paid embedding API** — smaller and a little
-  less accurate than something like OpenAI's `text-embedding-3-small`, but
-  it's a widely-used, genuinely solid model for retrieval, and it means
-  ingestion never touches the network after the first model download.
+- **`fastembed` (ONNX) vs. `sentence-transformers` (PyTorch)** — functionally
+  identical output for this project (same model, same 384-dim vectors), but
+  a meaningfully lighter dependency footprint — the difference between
+  fitting in a free-tier container and getting OOM-killed. See deployment
+  notes above.
 - **ChromaDB vs. a hosted vector DB (e.g. Pinecone)** — a local persistent
   client is enough for a single-document / small-corpus assistant like this
   one, and it means zero infrastructure to provision or pay for. Swapping in
@@ -212,11 +294,6 @@ of paid annual leave per calendar year, accrued monthly...
 - **Chunking is fixed-size + overlap**, not semantic chunking — simple,
   fast, and predictable. A natural next step (see below) is to chunk by
   section/heading instead.
-- **`hr_policy_agent/` vs. `scripts/terminal_chat.py`** — both do the same
-  retrieve→generate flow; the ADK agent is the "real" interface (dev UI,
-  REST server, tool-calling, extensible to more tools), while the terminal
-  script is a minimal way to sanity-check retrieval and generation without
-  standing up the agent server.
 
 ## Possible extensions
 
@@ -225,9 +302,8 @@ of paid annual leave per calendar year, accrued monthly...
 - Add conversation memory so follow-up questions ("...and how does that
   compare to sick leave?") resolve correctly.
 - Chunk by document section instead of fixed character count.
-- Add a lightweight eval set (question → expected policy clause) to measure
-  retrieval quality as the chunking/embedding strategy changes.
-- Deploy `adk api_server` behind a small frontend for a shareable demo link.
+- Move off Render's free tier (or add a lightweight external "ping" job) to
+  avoid the cold-start delay for a more polished demo.
 
 ---
 
