@@ -1,0 +1,9 @@
+# --- Ingestion (Phase 1) ---
+pypdf                  # PDF text extraction
+sentence-transformers   # local, free embeddings (all-MiniLM-L6-v2)
+chromadb                # local, free vector database
+
+# --- Query & agent (Phase 2 + 3) ---
+google-adk               # Google Agent Development Kit
+google-genai              # Gemini API client (used by scripts/terminal_chat.py)
+python-dotenv              # loads .env files

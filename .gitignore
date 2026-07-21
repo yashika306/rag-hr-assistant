@@ -1,0 +1,20 @@
+# Environments / secrets
+.env
+hr_policy_agent/.env
+venv/
+.venv/
+
+# Generated vector database (rebuild anytime with `python -m src.pipeline`)
+chroma_db/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

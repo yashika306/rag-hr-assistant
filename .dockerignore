@@ -1,0 +1,10 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+.env
+hr_policy_agent/.env
+chroma_db/
+.DS_Store
