@@ -13,7 +13,7 @@ local, free retrieval stack. **Total cost to build and run this project: $0.**
 
 ## Architecture
 
-![RAG HR Assistant Architecture](docs/architecture.png)
+![RAG HR Assistant Architecture](<docs/RAG HR Assistant architecture diagram.png>)
 
 The system has two phases:
 
@@ -29,14 +29,14 @@ The system has two phases:
 
 ## Tech stack
 
-| Layer | Technology | Why | Cost |
-|---|---|---|---|
-| Agent framework | **Google Agent Development Kit (ADK)** | Production-style agent runtime with tool-calling, a built-in dev UI (`adk web`), and a REST server (`adk api_server`) out of the box | Free (open source) |
-| LLM | **Gemini 2.5 Flash** (Google AI Studio) | Fast, capable, first-class ADK model provider — no adapter needed | Free tier |
-| Embeddings | **sentence-transformers** (`all-MiniLM-L6-v2`) | Runs entirely on your own machine — no API call, no rate limit, no key | Free, local |
-| Vector database | **ChromaDB** (persistent, local) | Zero-setup vector store that lives in a folder on disk | Free, local |
-| PDF parsing | **pypdf** | Lightweight, reliable text extraction | Free |
-| Orchestration | Plain Python | Easy to read, easy to extend | — |
+| Layer           | Technology                                             | Why                                                                                                                                      | Cost               |
+| --------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| Agent framework | **Google Agent Development Kit (ADK)**           | Production-style agent runtime with tool-calling, a built-in dev UI (`adk web`), and a REST server (`adk api_server`) out of the box | Free (open source) |
+| LLM             | **Gemini 2.5 Flash** (Google AI Studio)          | Fast, capable, first-class ADK model provider — no adapter needed                                                                       | Free tier          |
+| Embeddings      | **sentence-transformers** (`all-MiniLM-L6-v2`) | Runs entirely on your own machine — no API call, no rate limit, no key                                                                  | Free, local        |
+| Vector database | **ChromaDB** (persistent, local)                 | Zero-setup vector store that lives in a folder on disk                                                                                   | Free, local        |
+| PDF parsing     | **pypdf**                                        | Lightweight, reliable text extraction                                                                                                    | Free               |
+| Orchestration   | Plain Python                                           | Easy to read, easy to extend                                                                                                             | —                 |
 
 **No OpenAI key. No Pinecone account. No credit card, anywhere.** The only
 credential in the whole project is a free Gemini API key from Google AI
@@ -108,6 +108,7 @@ cp hr_policy_agent/.env.example hr_policy_agent/.env
 ```
 
 Edit both files and paste in your key:
+
 ```
 GOOGLE_API_KEY=your-actual-gemini-key
 GOOGLE_GENAI_USE_VERTEXAI=FALSE
@@ -134,13 +135,16 @@ To use your **own** PDF instead of the sample policy, replace
 ### 4. Run the agent
 
 **Option A — browser UI** (best for demoing / trying it out):
+
 ```bash
 adk web
 ```
+
 Open the printed URL (usually `http://localhost:8000`), select
 `hr_policy_agent` from the dropdown, and chat.
 
 **Option B — REST API** (best for calling it from another app):
+
 ```bash
 adk api_server
 ```
@@ -150,6 +154,7 @@ Run both commands **from the project root**, not from inside
 directory, and that's also what lets `chroma_db/` resolve correctly.
 
 **Option C — plain terminal loop** (no ADK, quick sanity check):
+
 ```bash
 python -m scripts.terminal_chat
 ```
